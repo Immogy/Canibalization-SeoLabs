@@ -121,7 +121,7 @@ export default async function handler(req, res) {
   const robotsUrl = origin.replace(/\/$/,'') + '/robots.txt';
   const sitemaps = [];
   try {
-    const rob = await fetchWithRetry(robotsUrl, 2, 8000);
+    const rob = await fetchWithRetry(robotsUrl, 3, 15000);
     const robTxt = await rob.text();
     extractSitemapsFromRobots(robTxt).forEach(u => sitemaps.push(u));
   } catch(_) {}
@@ -134,7 +134,7 @@ export default async function handler(req, res) {
   for (const sm of sitemaps) {
     if (urls.length >= limit) break;
     try {
-      const part = await expandSitemapConcurrent(sm, limit - urls.length, fast, 12);
+      const part = await expandSitemapConcurrent(sm, limit - urls.length, fast, 16);
       urls = urls.concat(part);
     } catch(_) {}
   }
