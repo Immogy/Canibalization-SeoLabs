@@ -1,3 +1,35 @@
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+async function fetchWithRetry(url, tries = 3, timeoutMs = 12000) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: ctrl.signal,
+        headers: {
+          'user-agent': UA,
+          'accept': 'application/xml,text/xml,text/html;q=0.9,application/xhtml+xml;q=0.8,*/*;q=0.5',
+          'cache-control': 'no-cache',
+          'pragma': 'no-cache'
+        }
+      });
+      clearTimeout(timer);
+      if (r.ok) return r;
+      lastErr = new Error(`Upstream ${r.status}`);
+    } catch (e) {
+      clearTimeout(timer);
+      lastErr = e;
+      // backoff
+      await new Promise(r => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw lastErr || new Error('fetch failed');
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,7 +43,26 @@ export default async function handler(req, res) {
     return res.status(400).send('Missing url');
   }
   try {
-    const upstream = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 SeoLabs Proxy' } });
+    // připrav varianty URL (http/https, s www/bez www)
+    const makeVariants = (u) => {
+      try {
+        const o = new URL(u);
+        const host = o.hostname.replace(/^www\./i, '');
+        const path = o.pathname + (o.search || '');
+        return [
+          `https://${host}${path}`,
+          `https://www.${host}${path}`,
+          `http://${host}${path}`,
+          `http://www.${host}${path}`
+        ];
+      } catch(_) { return [u]; }
+    };
+    const variants = makeVariants(url);
+    let upstream = null; let lastErr;
+    for (const v of variants) {
+      try { upstream = await fetchWithRetry(v, 3, 12000); break; } catch(e) { lastErr = e; }
+    }
+    if (!upstream) throw lastErr || new Error('All variants failed');
     const ct = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
     const status = upstream.status;
     const buf = await upstream.arrayBuffer();
