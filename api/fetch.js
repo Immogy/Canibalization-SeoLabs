@@ -32,7 +32,7 @@ async function fetchWithRetry(url, tries = 3, timeoutMs = 12000) {
 
 // Jednoduché per-host throttling (omezení zahlcení / WAF)
 const hostTimestamps = new Map();
-async function throttleHost(host, delayMs = 500) {
+async function throttleHost(host, delayMs = 250) {
   const last = hostTimestamps.get(host) || 0;
   const now = Date.now();
   const wait = Math.max(0, last + delayMs - now);
