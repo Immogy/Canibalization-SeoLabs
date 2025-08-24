@@ -30,6 +30,16 @@ async function fetchWithRetry(url, tries = 3, timeoutMs = 12000) {
   throw lastErr || new Error('fetch failed');
 }
 
+// Jednoduché per-host throttling (omezení zahlcení / WAF)
+const hostTimestamps = new Map();
+async function throttleHost(host, delayMs = 500) {
+  const last = hostTimestamps.get(host) || 0;
+  const now = Date.now();
+  const wait = Math.max(0, last + delayMs - now);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  hostTimestamps.set(host, Date.now());
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -49,6 +59,8 @@ export default async function handler(req, res) {
         const o = new URL(u);
         const host = o.hostname.replace(/^www\./i, '');
         const path = o.pathname + (o.search || '');
+        // per-host throttling
+        throttleHost(host).catch(()=>{});
         return [
           `https://${host}${path}`,
           `https://www.${host}${path}`,
@@ -62,7 +74,18 @@ export default async function handler(req, res) {
     for (const v of variants) {
       try { upstream = await fetchWithRetry(v, 3, 12000); break; } catch(e) { lastErr = e; }
     }
-    if (!upstream) throw lastErr || new Error('All variants failed');
+    if (!upstream || !upstream.ok) {
+      // Server-side fallback přes r.jina.ai (read-only)
+      const hostPath = (()=>{ try { const u = new URL(url); return u.host + u.pathname + (u.search||''); } catch(_) { return url.replace(/^https?:\/\//i,''); } })();
+      const jinaVariants = [
+        'https://r.jina.ai/http://' + hostPath,
+        'https://r.jina.ai/https://' + hostPath,
+      ];
+      for (const j of jinaVariants) {
+        try { upstream = await fetchWithRetry(j, 2, 12000); if (upstream.ok) break; } catch(e) { lastErr = e; }
+      }
+      if (!upstream) throw lastErr || new Error('All variants failed');
+    }
     const ct = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
     const status = upstream.status;
     const buf = await upstream.arrayBuffer();
