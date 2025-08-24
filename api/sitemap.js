@@ -55,7 +55,16 @@ function extractSitemapsFromRobots(text) {
 function parseXmlLike(text) {
   const isIndex = /<\s*sitemapindex[\s>]/i.test(text);
   const isUrlset = /<\s*urlset[\s>]/i.test(text);
-  const locs = Array.from(text.matchAll(/<\s*loc\s*>\s*([^<\s]+)\s*<\s*\/\s*loc\s*>/gi)).map(m=>m[1]);
+  let locs = [];
+  if (isUrlset) {
+    // Ber pouze <url><loc>…</loc></url> – ignoruj image:loc apod.
+    const urlLocMatches = Array.from(text.matchAll(/<\s*url[\s\S]*?<\s*loc\s*>\s*([^<\s]+)\s*<\s*\/\s*loc\s*>[\s\S]*?<\s*\/\s*url\s*>/gi));
+    locs = urlLocMatches.map(m => m[1]);
+  } else if (isIndex) {
+    locs = Array.from(text.matchAll(/<\s*loc\s*>\s*([^<\s]+)\s*<\s*\/\s*loc\s*>/gi)).map(m=>m[1]);
+  }
+  // Odfiltruj zjevné soubory (obrázky, pdf)
+  locs = locs.filter(u => !/\.(jpg|jpeg|png|gif|webp|svg|avif|pdf)(\?.*)?$/i.test(u));
   return { type: isIndex ? 'index' : (isUrlset ? 'urlset' : 'unknown'), items: locs };
 }
 
