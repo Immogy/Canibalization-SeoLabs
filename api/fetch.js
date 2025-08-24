@@ -1,3 +1,4 @@
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'zlib';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
 async function fetchWithRetry(url, tries = 3, timeoutMs = 12000) {
@@ -87,11 +88,17 @@ export default async function handler(req, res) {
       if (!upstream) throw lastErr || new Error('All variants failed');
     }
     const ct = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
+    const enc = (upstream.headers.get('content-encoding') || '').toLowerCase();
     const status = upstream.status;
-    const buf = await upstream.arrayBuffer();
+    let buf = Buffer.from(await upstream.arrayBuffer());
+    try {
+      if (enc.includes('gzip')) buf = gunzipSync(buf);
+      else if (enc.includes('br')) buf = brotliDecompressSync(buf);
+      else if (enc.includes('deflate')) buf = inflateSync(buf);
+    } catch(_) {}
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', ct.includes('xml') || ct.includes('html') || ct.includes('text') || ct.includes('json') ? ct : 'text/plain; charset=utf-8');
-    return res.status(status).send(Buffer.from(buf));
+    return res.status(status).send(buf);
   } catch (e) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(502).send('Proxy error: ' + e.message);
