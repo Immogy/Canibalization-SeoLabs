@@ -14,18 +14,32 @@ export default async function handler(req, res) {
     const { code, state } = req.query;
     if (!code || !state) return res.status(400).send('Missing code/state');
 
-    // read cookie payload
+    // detect popup vs cookie mode
+    let mode = 'cookie';
+    let cv, ru;
     const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_oauth='));
-    if (!cookie) return res.status(400).send('Missing oauth cookie');
-    const payload = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
-    if (payload.state !== state) return res.status(400).send('Invalid state');
+    if (cookie) {
+      const payload = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
+      if (payload.state !== state) return res.status(400).send('Invalid state');
+      cv = payload.cv; ru = payload.ru;
+    } else {
+      // popup mode: state je base64url JSON
+      try {
+        const st = JSON.parse(Buffer.from(state.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString());
+        if (!st || st.m !== 'popup') return res.status(400).send('Invalid state');
+        mode = 'popup';
+        cv = st.cv; ru = st.ru;
+      } catch {
+        return res.status(400).send('Missing oauth cookie/state');
+      }
+    }
 
     const body = new URLSearchParams({
       client_id: clientId,
       code: String(code),
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
-      code_verifier: payload.cv,
+      code_verifier: cv,
     });
 
     const r = await fetch('https://oauth2.googleapis.com/token', {
@@ -36,17 +50,25 @@ export default async function handler(req, res) {
     const tokens = await r.json();
     if (!r.ok) return res.status(500).send('Token exchange failed: ' + JSON.stringify(tokens));
 
-    // store refresh token securely (simple cookie demo – doporučuji DB/KV)
-    // Pozn.: V produkci uložte do DB pod uživatelský účet. Zde jen pro demo uložím do cookie (šifrování by bylo lepší).
-    const storage = { rt: tokens.refresh_token, at: tokens.access_token, exp: Date.now() + (tokens.expires_in||0)*1000 };
-    res.setHeader('Set-Cookie', [
-      `gsc_tokens=${encodeURIComponent(JSON.stringify(storage))}; HttpOnly; Path=/; SameSite=Lax; Secure`,
-      // clear temporary oauth cookie
-      'gsc_oauth=; HttpOnly; Path=/; SameSite=Lax; Secure; Max-Age=0'
-    ]);
-
-    res.writeHead(302, { Location: payload.ru || origin });
-    res.end();
+    if (mode === 'cookie') {
+      const storage = { rt: tokens.refresh_token, at: tokens.access_token, exp: Date.now() + (tokens.expires_in||0)*1000 };
+      res.setHeader('Set-Cookie', [
+        `gsc_tokens=${encodeURIComponent(JSON.stringify(storage))}; HttpOnly; Path=/; SameSite=Lax; Secure`,
+        'gsc_oauth=; HttpOnly; Path=/; SameSite=Lax; Secure; Max-Age=0'
+      ]);
+      res.writeHead(302, { Location: ru || origin });
+      res.end();
+    } else {
+      // popup mode: vrátíme HTML, které předá tokeny zpět původní stránce přes postMessage
+      const html = `<!doctype html><html><body><script>
+        try {
+          window.opener && window.opener.postMessage({ source:'gsc-oauth', tokens:${JSON.stringify(tokens)} }, '${ru ? new URL(ru).origin : origin}');
+        } catch (e) {}
+        window.close();
+      </script>Úspěšně přihlášeno. Zavřete okno.</body></html>`;
+      res.setHeader('Content-Type','text/html; charset=utf-8');
+      res.end(html);
+    }
   } catch (e) {
     res.status(500).send(e.message || String(e));
   }
