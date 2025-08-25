@@ -1,5 +1,16 @@
 // Lists verified GSC sites for the current user (reads tokens from cookie)
 
+function allowCors(req, res) {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).end(); return true; }
+  return false;
+}
+
 async function ensureAccessToken(req) {
   const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_tokens='));
   if (!cookie) throw new Error('Not authenticated');
@@ -23,6 +34,7 @@ async function ensureAccessToken(req) {
 
 export default async function handler(req, res) {
   try {
+    if (allowCors(req, res)) return;
     const tokens = await ensureAccessToken(req);
     const r = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
       headers: { Authorization: `Bearer ${tokens.at}` }
