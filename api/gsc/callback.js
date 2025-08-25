@@ -18,21 +18,26 @@ export default async function handler(req, res) {
     // detect popup vs cookie mode
     let mode = 'cookie';
     let cv, ru;
-    const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_oauth='));
-    if (cookie) {
+
+    // try parse popup state first (even if cookie exists – kvůli zbytkové cookie z minulého běhu)
+    let parsedPopup = null;
+    try {
+      const s = String(state || '');
+      const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64 + '==='.slice((b64.length + 3) % 4);
+      parsedPopup = JSON.parse(Buffer.from(pad, 'base64').toString('utf8'));
+    } catch {}
+
+    if (parsedPopup && parsedPopup.m === 'popup' && parsedPopup.cv) {
+      mode = 'popup';
+      cv = parsedPopup.cv;
+      ru = parsedPopup.ru;
+    } else {
+      const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_oauth='));
+      if (!cookie) return res.status(400).send('Missing oauth cookie/state');
       const payload = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
       if (payload.state !== state) return res.status(400).send('Invalid state');
       cv = payload.cv; ru = payload.ru;
-    } else {
-      // popup mode: state je base64url JSON
-      try {
-        const st = JSON.parse(Buffer.from(state.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString());
-        if (!st || st.m !== 'popup') return res.status(400).send('Invalid state');
-        mode = 'popup';
-        cv = st.cv; ru = st.ru;
-      } catch {
-        return res.status(400).send('Missing oauth cookie/state');
-      }
     }
 
     const body = new URLSearchParams({
