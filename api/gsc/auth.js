@@ -62,7 +62,11 @@ export default async function handler(req, res) {
       '&code_challenge_method=S256' +
       `&state=${state}`;
 
-    res.writeHead(302, { Location: authUrl });
+    // Bezpečnost: přidej explicitní prompt, aby Google stránku vždy vykreslil
+    // a předejdeme „silent“ výsledku v některých prohlížečích
+    const urlWithPrompt = authUrl + '&prompt=consent';
+
+    res.writeHead(302, { Location: urlWithPrompt });
     res.end();
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
