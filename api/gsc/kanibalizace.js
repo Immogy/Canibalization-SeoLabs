@@ -1,6 +1,17 @@
 // Aggregates GSC Search Analytics across full available range (~16 months)
 // Returns queries where multiple pages of the same domain rank (real cannibalization)
 
+function allowCors(req, res) {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).end(); return true; }
+  return false;
+}
+
 async function ensureAccessToken(req) {
   const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_tokens='));
   if (!cookie) throw new Error('Not authenticated');
@@ -20,6 +31,7 @@ function min(a,b){ return a < b ? a : b; }
 
 export default async function handler(req, res) {
   try {
+    if (allowCors(req, res)) return;
     const tokens = await ensureAccessToken(req);
     const property = req.query.property || req.query.siteUrl;
     if (!property) return res.status(400).json({ error: 'Missing property (siteUrl)' });
