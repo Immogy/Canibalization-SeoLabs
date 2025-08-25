@@ -61,12 +61,10 @@ export default async function handler(req, res) {
     } else {
       // popup mode: vrátíme HTML, které předá tokeny zpět původní stránce přes postMessage
       const storage = { rt: tokens.refresh_token, at: tokens.access_token, exp: Date.now() + (tokens.expires_in||0)*1000 };
-      // nastav také 3rd-party cookie (SameSite=None) pro následné CORS požadavky s credentials
+      // nastav i 3rd-party cookie (SameSite=None) pro případ, že klient bude používat credentials
       res.setHeader('Set-Cookie', `gsc_tokens=${encodeURIComponent(JSON.stringify(storage))}; HttpOnly; Path=/; SameSite=None; Secure`);
       const html = `<!doctype html><html><body><script>
-        try {
-          window.opener && window.opener.postMessage({ source:'gsc-oauth', tokens:${JSON.stringify(tokens)} }, '${ru ? new URL(ru).origin : origin}');
-        } catch (e) {}
+        try { window.opener && window.opener.postMessage({ source:'gsc-oauth', tokens:${JSON.stringify(tokens)} }, '${ru ? new URL(ru).origin : origin}'); } catch (e) {}
         window.close();
       </script>Úspěšně přihlášeno. Zavřete okno.</body></html>`;
       res.setHeader('Content-Type','text/html; charset=utf-8');
