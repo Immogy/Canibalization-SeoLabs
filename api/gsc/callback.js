@@ -5,6 +5,7 @@
 export default async function handler(req, res) {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
     if (!clientId) return res.status(500).send('Missing GOOGLE_CLIENT_ID');
 
     const proto = (req.headers['x-forwarded-proto'] || 'https').toString();
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
       redirect_uri: redirectUri,
       code_verifier: cv,
     });
+    if (clientSecret) body.set('client_secret', clientSecret);
 
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
