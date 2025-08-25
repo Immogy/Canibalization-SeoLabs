@@ -28,6 +28,7 @@ export default async function handler(req, res) {
     const origin = getOrigin(req);
     const redirectUri = `${origin}/api/gsc/callback`;
     const returnUrl = typeof req.query.returnUrl === 'string' ? req.query.returnUrl : origin;
+    const mode = (req.query.mode === 'popup') ? 'popup' : 'cookie';
     // security: allow only same-origin return
     const safeReturn = returnUrl.startsWith(origin) ? returnUrl : origin;
 
@@ -36,10 +37,17 @@ export default async function handler(req, res) {
     const challengeBuffer = await sha256(code_verifier);
     const code_challenge = base64urlencode(Buffer.from(challengeBuffer));
 
-    // store state in cookie (signed could be added); keep short json
-    const state = base64urlencode(randomBytes(16));
-    const payload = { v: 1, state, cv: code_verifier, ru: safeReturn };
-    res.setHeader('Set-Cookie', `gsc_oauth=${encodeURIComponent(JSON.stringify(payload))}; HttpOnly; Path=/; SameSite=Lax; Secure`);
+    // state: cookie nebo popup bez cookie
+    let state;
+    if (mode === 'cookie') {
+      state = base64urlencode(randomBytes(16));
+      const payload = { v: 1, state, cv: code_verifier, ru: safeReturn };
+      res.setHeader('Set-Cookie', `gsc_oauth=${encodeURIComponent(JSON.stringify(payload))}; HttpOnly; Path=/; SameSite=Lax; Secure`);
+    } else {
+      // předej potřebná data v state (base64url JSON)
+      const stObj = { v: 1, m: 'popup', cv: code_verifier, ru: safeReturn };
+      state = base64urlencode(Buffer.from(JSON.stringify(stObj)));
+    }
 
     const scope = encodeURIComponent('https://www.googleapis.com/auth/webmasters.readonly');
     const authUrl =
