@@ -66,6 +66,17 @@ export default async function handler(req, res) {
     // a předejdeme „silent“ výsledku v některých prohlížečích
     const urlWithPrompt = authUrl + '&prompt=consent';
 
+    if (req.query.debug === '1') {
+      res.status(200).json({
+        ok: true,
+        origin,
+        redirectUri,
+        authUrl: urlWithPrompt,
+        clientId
+      });
+      return;
+    }
+
     res.writeHead(302, { Location: urlWithPrompt });
     res.end();
   } catch (e) {
