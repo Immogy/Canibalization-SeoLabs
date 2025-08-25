@@ -1,4 +1,4 @@
-export const config = { runtime: 'nodejs18.x' };
+
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB safety limit
