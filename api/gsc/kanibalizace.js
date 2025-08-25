@@ -13,6 +13,13 @@ function allowCors(req, res) {
 }
 
 async function ensureAccessToken(req) {
+  // Prefer Bearer token z klienta (poslaný po postMessage)
+  const auth = (req.headers.authorization || '').trim();
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    const at = auth.slice(7).trim();
+    if (at) return { at, exp: Date.now() + 5 * 60 * 1000 };
+  }
+  // Cookie fallback
   const cookie = (req.headers.cookie || '').split(';').map(s=>s.trim()).find(s=>s.startsWith('gsc_tokens='));
   if (!cookie) throw new Error('Not authenticated');
   const tokens = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
