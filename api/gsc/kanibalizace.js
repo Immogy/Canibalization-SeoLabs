@@ -52,7 +52,9 @@ export default async function handler(req, res) {
 
     // determine available range: last 16 months from today
     const today = new Date();
-    const start = addDays(today, -480); // ~16 months
+    const daysParam = parseInt(String(req.query.days||''), 10);
+    const days = isNaN(daysParam) ? 480 : Math.min(480, Math.max(7, daysParam));
+    const start = addDays(today, -days); // default ~16 months, override via ?days=
     const end = today;
 
     const queryBody = (startDate, endDate, startRow=0) => ({
