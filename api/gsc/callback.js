@@ -71,7 +71,14 @@ export default async function handler(req, res) {
       // nastav i 3rd-party cookie (SameSite=None) pro případ, že klient bude používat credentials
       res.setHeader('Set-Cookie', `gsc_tokens=${encodeURIComponent(JSON.stringify(storage))}; HttpOnly; Path=/; SameSite=None; Secure`);
       const html = `<!doctype html><html><body><script>
-        try { window.opener && window.opener.postMessage({ source:'gsc-oauth', tokens:${JSON.stringify(tokens)} }, '${ru ? new URL(ru).origin : origin}'); } catch (e) {}
+        try {
+          // odešli tokeny do openeru
+          window.opener && window.opener.postMessage({ source:'gsc-oauth', tokens:${JSON.stringify(tokens)} }, '${ru ? new URL(ru).origin : origin}');
+          // a pro jistotu ulož access token i do localStorage v openeru (pokud je dostupný)
+          if (window.opener && window.opener.localStorage) {
+            try { window.opener.localStorage.setItem('gsc_at', '${tokens.access_token || ''}'); } catch (e) {}
+          }
+        } catch (e) {}
         window.close();
       </script>Úspěšně přihlášeno. Zavřete okno.</body></html>`;
       res.setHeader('Content-Type','text/html; charset=utf-8');
