@@ -76,7 +76,13 @@ export default async function handler(req, res) {
       return;
     }
 
-    res.writeHead(302, { Location: urlWithPrompt });
+    // Volitelně vynutit nativní Account Chooser (pokud select_account nestačí)
+    const forcePicker = req.query.picker === '1' || req.query.forcePicker === '1';
+    const redirect = forcePicker
+      ? `https://accounts.google.com/AccountChooser?continue=${encodeURIComponent(urlWithPrompt)}`
+      : urlWithPrompt;
+
+    res.writeHead(302, { Location: redirect });
     res.end();
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
