@@ -62,8 +62,8 @@ export default async function handler(req, res) {
       '&code_challenge_method=S256' +
       `&state=${state}`;
 
-    // Vynucení výběru účtu + znovu vyžádání souhlasu
-    const urlWithPrompt = authUrl + '&prompt=consent%20select_account';
+    // Vynucení výběru účtu + znovu vyžádání souhlasu + re-login (vyžádá přihlášení a výběr účtu)
+    const urlWithPrompt = authUrl + '&prompt=consent%20select_account%20login';
 
     if (req.query.debug === '1') {
       res.status(200).json({
