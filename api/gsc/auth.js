@@ -78,9 +78,15 @@ export default async function handler(req, res) {
 
     // Volitelně vynutit nativní Account Chooser (pokud select_account nestačí)
     const forcePicker = req.query.picker === '1' || req.query.forcePicker === '1';
-    const redirect = forcePicker
+    let redirect = forcePicker
       ? `https://accounts.google.com/AccountChooser?continue=${encodeURIComponent(urlWithPrompt)}`
       : urlWithPrompt;
+
+    // Volitelně vynutit odhlášení Google účtu v popupu, aby se zobrazil picker a nezafungovalo auto-login
+    const forceLogout = req.query.forceLogout === '1' || req.query.logout === '1';
+    if (forceLogout) {
+      redirect = `https://accounts.google.com/Logout?continue=${encodeURIComponent(redirect)}`;
+    }
 
     res.writeHead(302, { Location: redirect });
     res.end();
