@@ -88,6 +88,14 @@ export default async function handler(req, res) {
       redirect = `https://accounts.google.com/Logout?continue=${encodeURIComponent(redirect)}`;
     }
 
+    // Volitelně vynutit plný login flow (zadání účtu), i když je aktivní session
+    // Přesměrujeme přes ServiceLogin se službou webmasters, aby se uživatel musel vybrat/přihlásit
+    const forceLogin = req.query.forceLogin === '1' || req.query.login === '1';
+    if (forceLogin) {
+      const cont = redirect;
+      redirect = `https://accounts.google.com/ServiceLogin?service=webmastertools&passive=false&continue=${encodeURIComponent(cont)}`;
+    }
+
     res.writeHead(302, { Location: redirect });
     res.end();
   } catch (e) {
