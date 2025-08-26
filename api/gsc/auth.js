@@ -62,9 +62,8 @@ export default async function handler(req, res) {
       '&code_challenge_method=S256' +
       `&state=${state}`;
 
-    // Bezpečnost: přidej explicitní prompt, aby Google stránku vždy vykreslil
-    // a předejdeme „silent“ výsledku v některých prohlížečích
-    const urlWithPrompt = authUrl + '&prompt=consent';
+    // Vynucení výběru účtu: zobrazí account picker i při aktivní session
+    const urlWithPrompt = authUrl + '&prompt=select_account';
 
     if (req.query.debug === '1') {
       res.status(200).json({
