@@ -57,13 +57,13 @@ export default async function handler(req, res) {
       '&response_type=code' +
       `&scope=${scope}` +
       '&access_type=offline' +
-      '&include_granted_scopes=true' +
+      '&include_granted_scopes=false' +
       `&code_challenge=${code_challenge}` +
       '&code_challenge_method=S256' +
       `&state=${state}`;
 
-    // Vynucení výběru účtu: zobrazí account picker i při aktivní session
-    const urlWithPrompt = authUrl + '&prompt=select_account';
+    // Vynucení výběru účtu + znovu vyžádání souhlasu
+    const urlWithPrompt = authUrl + '&prompt=consent%20select_account';
 
     if (req.query.debug === '1') {
       res.status(200).json({
